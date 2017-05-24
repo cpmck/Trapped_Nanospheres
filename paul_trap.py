@@ -147,7 +147,7 @@ class B_field(object):
 		hbar = codata.value("Planck constant")
 		ge = codata.value('electron g factor')
 		muB = codata.value('Bohr magneton')
-		omega = ge*muB/hbar*self.field_grad
+		omega = ge*muB*self.field_grad/hbar
 		return omega
 
 
@@ -236,33 +236,60 @@ def make_sytem(m1,m2,r1,r2,q1,q2,B,V,r):
 	trap_1 = Harmonic_Paul_trap(V, r)
 	B_field_1 = B_field(B)
 
+	
 	system_1 = System(trap_1,sphere_1,sphere_2,B_field_1)
+	positions = system_1.equilibrium()
+	mass_1 = system_1.sphere_1.mass()
+	mass_2 = system_1.sphere_2.mass()
+	charge_1 = system_1.sphere_1.charge()
+	charge_2 = system_1.sphere_2.charge()
+	coupling = system_1.J().item((0.1))
+	omegaT = system_1.omegaT()*1e-3/(2*np.pi)
+	dxomega = system_1.B_field.dxomega()*1e-6*positions/(2*np.pi)
+	V = system_1.trap1.V
+	r = system_1.trap1.r
+
+
+
+
+	print('    Variable                  ','ion_1                ', 'ion2')
+	print('Equilibrium positions (m)   ', positions[0], '        ', positions[1] )
+	print('mass                  (kg)  ', mass_1, '         ', mass_2 )
+	print('charge                (C)   ', charge_1, '            ', charge_2 )
+	print('nu/2pi                (kHz) ', omegaT[0],'            ', omegaT[1] )
+	print('DeltaOmega/2pi        (MHz) ', dxomega )
+	print('coupling J12          (Hz)  ', coupling )
+	print('Trap Potential        (V)   ', V )
+	print('Trap size (r_0)       (m)   ', r )
+
+
+
 
 	return system_1
 
 
-
+system_1 = make_sytem( 171*1.67e-27, 171*1.67e-27, 1e-8, 1e-8, 1.0, 1.0, 29.38, -0.2 ,0.001 )
 
 
 #plotting over single variables
-range_x = np.linspace(0,10,100)
-y = np.zeros(100)
-r_calc_1 = np.zeros(100)
-r_calc_2 = np.zeros(100)
+#range_x = np.linspace(0,10,100)
+#y = np.zeros(100)
+#r_calc_1 = np.zeros(100)
+#r_calc_2 = np.zeros(100)
 
 
-counter = 0
-for value in range_x:
+#counter = 0
+#for value in range_x:
 
-	system_1 = make_sytem( 171*1.6e-27, 171*1.67e-27, 1e-8, 1e-8, 1.0, .0, value, -0.5 ,0.001 )
-	y[counter] = system_1.J().item((0,1))
-	r_calc_1[counter] = system_1.equilibrium()[[0]]
-	r_calc_2[counter] = system_1.equilibrium()[[1]]
+	#system_1 = make_sytem( 171*1.6e-27, 171*1.67e-27, 1e-8, 1e-8, 1.0, 1.0, value, -0.5 ,0.001 )
+	#y[counter] = system_1.J().item((0,1))
+	#r_calc_1[counter] = system_1.equilibrium()[[0]]
+	#r_calc_2[counter] = system_1.equilibrium()[[1]]
 
-	counter = counter +1
-print(y)
+	#counter = counter +1
+#print(y)
 
-plt.plot(range_x,y)
+#plt.plot(range_x,y)
 #plt.plot(range_x, r_calc_1)
 #plt.plot(range_x, r_calc_2)
 plt.show()
