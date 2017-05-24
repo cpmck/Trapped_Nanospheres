@@ -18,9 +18,9 @@ from mpl_toolkits.mplot3d import Axes3D
 
 class Harmonic_Paul_trap(object):
 	def __init__(self, V, r ):
-		
+		#e_charge = codata.value("elementary charge")
 
-		self.V = V # volts
+		self.V = V #/e_charge # volts
 		self.r = r # metres
 
 	def field(self, x):
@@ -162,7 +162,7 @@ class System(object):
 
 
 	def omegaT(self):
-
+		e_charge = codata.value("elementary charge")
 		#calculate the energy frequncy spacing of harmonic oscillator
 		wT1 = 2 * self.sphere_1.charge() * np.array(self.trap1.V) / ( self.sphere_1.mass() * np.array( self.trap1.r ) * np.array( self.trap1.r ))
 		wT2 = 2 * self.sphere_2.charge() * np.array(self.trap1.V) / ( self.sphere_2.mass() * np.array( self.trap1.r ) * np.array( self.trap1.r ))
@@ -177,7 +177,7 @@ class System(object):
 		
 
 	def potential(self,x):        
-		
+		e_charge = codata.value("elementary charge")
 		potential_val_trap = self.sphere_1.charge()*self.trap1.field(x[[0]]) + self.sphere_2.charge()*self.trap1.field(x[[1]])
 		potential_val_ions = self.sphere_1.charge()*self.sphere_2.field(x[[0]],x[[1]]) + self.sphere_2.charge()*self.sphere_1.field(x[[0]],x[[1]])
 		potential_val = potential_val_trap + potential_val_ions
@@ -195,20 +195,21 @@ class System(object):
 	def hessian(self, x):
 
 		A = np.zeros([2,2])
-		A[0,0] = self.sphere_1.charge()*self.trap1.d2xfield(x[[0]]) + self.sphere_1.charge()*self.sphere_2.d2xfield(x[[0]],x[[1]]) + self.sphere_2.charge()*self.sphere_1.d2xfield(x[[0]],x[[1]])
+		A[0,0] = self.sphere_1.charge()*self.trap1.d2xfield(x[[0]]) + self.sphere_1.charge()*self.sphere_2.d2xfield(x[[0]],x[[1]]) + self.sphere_2.charge()*self.sphere_1.d2xfield(x[[0]],x[[1]]) 
 		A[1,1] = self.sphere_1.charge()*self.trap1.d2xfield(x[[1]]) + self.sphere_1.charge()*self.sphere_2.d2xfield(x[[1]],x[[0]]) + self.sphere_2.charge()*self.sphere_1.d2xfield(x[[1]],x[[0]])
 		A[0,1] = self.sphere_1.charge()*self.sphere_2.dydxfield(x[[0]],x[[1]]) + self.sphere_2.charge()*self.sphere_1.dydxfield(x[[0]],x[[1]])
 		A[1,0] = self.sphere_1.charge()*self.sphere_2.dydxfield(x[[1]],x[[0]]) + self.sphere_2.charge()*self.sphere_1.dydxfield(x[[1]],x[[0]])
 		#change outputs to matrices??
-		return A
+		return A * 2/ self.sphere_1.mass()
 
 
 	def S_matrix(self):
 
 		#calculate 
 		A = self.hessian( self.equilibrium() )
+
 		eig_vals = np.linalg.eig(A)[0]
-		S = np.linalg.eig(A)[1] 
+		S =   np.linalg.eig(A)[1] *np.array([[1,1],[1,-1]]) 
 		return S
 
 
@@ -227,6 +228,23 @@ class System(object):
 		couplings = np.asmatrix( np.transpose(epsilon) ) * np.asmatrix( epsilon*np.transpose(omegaT_mat))
 		return couplings
 
+	def J_alt(self):
+
+		epsilon = np.zeros([2,2])
+
+		J = np.zeros([2,2])
+
+		epsilon[0,0] = self.S_matrix().item((0,0)) *self.B_field.dxomega() *self.delta_z()[0] /self.omegaT()[0]
+		epsilon[0,1] = self.S_matrix().item((0,1)) *self.B_field.dxomega() *self.delta_z()[1] /self.omegaT()[1]
+		epsilon[1,0] = self.S_matrix().item((1,0)) *self.B_field.dxomega() *self.delta_z()[0] /self.omegaT()[0]
+		epsilon[1,1] = self.S_matrix().item((1,1)) *self.B_field.dxomega() *self.delta_z()[1] /self.omegaT()[1]
+
+		J[0,0] = self.omegaT()[0]*epsilon[0,0]*epsilon[0,0] + self.omegaT()[1]*epsilon[0,1]*epsilon[0,1]
+		J[0,1] = self.omegaT()[0]*epsilon[0,0]*epsilon[1,0] + self.omegaT()[1]*epsilon[0,1]*epsilon[1,1]
+		J[1,0] = self.omegaT()[0]*epsilon[1,0]*epsilon[0,0] + self.omegaT()[1]*epsilon[1,1]*epsilon[0,1]
+		J[1,1] = self.omegaT()[0]*epsilon[1,0]*epsilon[1,0] + self.omegaT()[1]*epsilon[1,1]*epsilon[1,1]
+
+		return J
 
 # function to make a system
 def make_sytem(m1,m2,r1,r2,q1,q2,B,V,r):
@@ -243,7 +261,7 @@ def make_sytem(m1,m2,r1,r2,q1,q2,B,V,r):
 	mass_2 = system_1.sphere_2.mass()
 	charge_1 = system_1.sphere_1.charge()
 	charge_2 = system_1.sphere_2.charge()
-	coupling = system_1.J().item((0.1))
+	coupling = system_1.J().item((0,0))
 	omegaT = system_1.omegaT()*1e-3/(2*np.pi)
 	dxomega = system_1.B_field.dxomega()*1e-6*positions/(2*np.pi)
 	V = system_1.trap1.V
@@ -268,28 +286,36 @@ def make_sytem(m1,m2,r1,r2,q1,q2,B,V,r):
 	return system_1
 
 
-system_1 = make_sytem( 171*1.67e-27, 171*1.67e-27, 1e-8, 1e-8, 1.0, 1.0, 29.38, -0.2 ,0.001 )
+e_charge = codata.value("elementary charge")
+
+system_1 = make_sytem( 171*1.67e-27, 171*1.67e-27, 1e-8, 1e-8, 1.0, 1.0, 29.38, -5 ,0.007 )
 
 
+print("hessian")
+print( system_1.J() )
 #plotting over single variables
-#range_x = np.linspace(0,10,100)
-#y = np.zeros(100)
-#r_calc_1 = np.zeros(100)
-#r_calc_2 = np.zeros(100)
+range_x = np.linspace(0,500,100)
+y = np.zeros(100)
+r_calc_1 = np.zeros(100)
+r_calc_2 = np.zeros(100)
 
 
 #counter = 0
 #for value in range_x:
 
-	#system_1 = make_sytem( 171*1.6e-27, 171*1.67e-27, 1e-8, 1e-8, 1.0, 1.0, value, -0.5 ,0.001 )
-	#y[counter] = system_1.J().item((0,1))
-	#r_calc_1[counter] = system_1.equilibrium()[[0]]
-	#r_calc_2[counter] = system_1.equilibrium()[[1]]
+#	system_1 = make_sytem( 171*1.6e-27, 171*1.67e-27, 1e-8, 1e-8, 1.0, 1.0, 29.38, -value ,0.001 )
+#	y[counter] = system_1.J().item((0,1))
+#	r_calc_1[counter] = system_1.equilibrium()[[0]]
 
-	#counter = counter +1
-#print(y)
+#	r_calc_2[counter] = system_1.equilibrium()[[1]]
+
+#	counter = counter +1
+#print(y)git 
 
 #plt.plot(range_x,y)
 #plt.plot(range_x, r_calc_1)
 #plt.plot(range_x, r_calc_2)
-plt.show()
+#plt.show()
+
+e_charge = codata.value("elementary charge")
+print(e_charge)
